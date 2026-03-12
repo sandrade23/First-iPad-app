@@ -17,6 +17,7 @@
       --border:#26324d;
       --shadow: 0 18px 50px rgba(0,0,0,.35);
       --radius: 18px;
+      --good:#55d19a;
     }
 
     * { box-sizing: border-box; }
@@ -32,7 +33,7 @@
     body { min-height: 100vh; }
 
     .wrap {
-      max-width: 980px;
+      max-width: 1180px;
       margin: 0 auto;
       padding: 20px 16px 48px;
     }
@@ -53,16 +54,16 @@
       color: var(--muted);
       font-size: 0.98rem;
       line-height: 1.45;
-      max-width: 820px;
+      max-width: 920px;
     }
 
     .grid {
       display: grid;
-      grid-template-columns: 1.08fr 0.92fr;
+      grid-template-columns: 1.05fr 0.95fr;
       gap: 16px;
     }
 
-    @media (max-width: 900px) {
+    @media (max-width: 980px) {
       .grid { grid-template-columns: 1fr; }
     }
 
@@ -151,6 +152,78 @@
       border: 1px solid var(--border);
     }
 
+    .toggle-row {
+      margin-top: 16px;
+      padding: 14px;
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      background: #0c1526;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 16px;
+    }
+
+    .toggle-copy {
+      min-width: 0;
+    }
+
+    .toggle-title {
+      font-weight: 600;
+      margin-bottom: 4px;
+    }
+
+    .toggle-sub {
+      color: var(--muted);
+      font-size: 0.84rem;
+      line-height: 1.4;
+    }
+
+    .switch {
+      position: relative;
+      width: 58px;
+      height: 32px;
+      flex: 0 0 auto;
+    }
+
+    .switch input {
+      opacity: 0;
+      width: 0;
+      height: 0;
+      position: absolute;
+    }
+
+    .slider {
+      position: absolute;
+      inset: 0;
+      background: #1a2740;
+      border: 1px solid var(--border);
+      border-radius: 999px;
+      transition: 0.2s ease;
+      cursor: pointer;
+    }
+
+    .slider:before {
+      content: "";
+      position: absolute;
+      width: 24px;
+      height: 24px;
+      left: 3px;
+      top: 3px;
+      background: white;
+      border-radius: 50%;
+      transition: 0.2s ease;
+    }
+
+    .switch input:checked + .slider {
+      background: rgba(85, 209, 154, 0.18);
+      border-color: var(--good);
+    }
+
+    .switch input:checked + .slider:before {
+      transform: translateX(26px);
+    }
+
     .note {
       margin-top: 14px;
       color: var(--muted);
@@ -182,7 +255,7 @@
     }
 
     .metric .v {
-      font-size: 1.35rem;
+      font-size: 1.25rem;
       font-weight: 700;
       letter-spacing: -0.02em;
       word-break: break-word;
@@ -198,7 +271,7 @@
     table {
       width: 100%;
       border-collapse: collapse;
-      min-width: 760px;
+      min-width: 980px;
       background: #0c1526;
     }
 
@@ -246,6 +319,12 @@
       font-size: 0.82rem;
       line-height: 1.45;
     }
+
+    .muted-inline {
+      color: var(--muted);
+      font-size: 0.82rem;
+      margin-top: 10px;
+    }
   </style>
 </head>
 <body>
@@ -253,7 +332,7 @@
     <div class="header">
       <h1>IRR Break-Even Gross Revenue Per Day</h1>
       <div class="sub">
-        Professional financial calculator for a shipping investment. Enter the investment assumptions and calculate the daily gross revenue required to achieve a target IRR, along with year 1 and average cash yield.
+        Shipping investment calculator focused on required daily revenue, year 1 cash yield, and average cash yield over the life of the vessel. Optional back leverage can be turned on or off.
       </div>
     </div>
 
@@ -311,6 +390,27 @@
               <label for="targetIRR">Target IRR %</label>
               <input id="targetIRR" type="number" step="0.01" value="15" />
             </div>
+
+            <div class="field">
+              <label for="leveragePct">Leverage %</label>
+              <input id="leveragePct" type="number" step="0.01" value="50" />
+            </div>
+
+            <div class="field">
+              <label for="backFinanceRate">Back Finance Interest Rate %</label>
+              <input id="backFinanceRate" type="number" step="0.01" value="8" />
+            </div>
+          </div>
+
+          <div class="toggle-row">
+            <div class="toggle-copy">
+              <div class="toggle-title">Use Back Leverage</div>
+              <div class="toggle-sub">Turn leverage on to calculate equity-based cash yield after annual back finance interest expense.</div>
+            </div>
+            <label class="switch" aria-label="Use Back Leverage">
+              <input id="useLeverage" type="checkbox" />
+              <span class="slider"></span>
+            </label>
           </div>
 
           <div class="actions">
@@ -319,7 +419,7 @@
           </div>
 
           <div class="note">
-            Assumptions: daily gross revenue is flat across the full investment term; annual revenue = daily revenue × 365; dry dock occurs in years 5, 10, 15, etc.; residual value is received in the final year; no debt, taxes, utilization adjustment, or working-capital timing.
+            Assumptions: daily gross revenue is flat across the full investment term; annual revenue = daily revenue × 365; dry dock occurs in years 5, 10, 15, etc.; residual value is received in the final year. Back leverage, when turned on, is modeled as interest-only with no amortization.
           </div>
         </div>
       </section>
@@ -341,15 +441,27 @@
             </div>
 
             <div class="metric">
-              <div class="k">Year 1 Operating Cash Yield</div>
+              <div class="k">Initial Equity Investment</div>
+              <div class="v" id="equityInvestment">—</div>
+            </div>
+
+            <div class="metric">
+              <div class="k">Annual Interest Expense</div>
+              <div class="v" id="annualInterestExpense">—</div>
+            </div>
+
+            <div class="metric">
+              <div class="k">Year 1 Cash Yield</div>
               <div class="v" id="year1Yield">—</div>
             </div>
 
             <div class="metric">
-              <div class="k">Average Operating Cash Yield</div>
+              <div class="k">Average Cash Yield</div>
               <div class="v" id="avgYield">—</div>
             </div>
           </div>
+
+          <div class="muted-inline" id="yieldBasisText">Yield basis: unlevered operating cash flow / initial investment</div>
 
           <div class="schedule-wrap">
             <table>
@@ -360,19 +472,20 @@
                   <th>Opex</th>
                   <th>Overhead</th>
                   <th>Dry Dock</th>
-                  <th>Net Cash Flow</th>
+                  <th>Interest</th>
+                  <th>Cash Flow to Equity</th>
                 </tr>
               </thead>
               <tbody id="scheduleBody">
                 <tr>
-                  <td colspan="6" style="text-align:center;color:#9fb0d1;">No calculation yet</td>
+                  <td colspan="7" style="text-align:center;color:#9fb0d1;">No calculation yet</td>
                 </tr>
               </tbody>
             </table>
           </div>
 
           <div class="footer">
-            Break-even revenue is solved by setting NPV equal to zero at the target IRR.
+            Break-even revenue is solved by setting NPV equal to zero at the target IRR. With leverage off, the target IRR is applied to the full investment. With leverage on, the target IRR is applied to initial equity only and annual interest expense is deducted from equity cash flow.
           </div>
         </div>
       </section>
@@ -392,7 +505,10 @@
       opexEscalator: $("opexEscalator"),
       dryDockEscalator: $("dryDockEscalator"),
       overheadEscalator: $("overheadEscalator"),
-      targetIRR: $("targetIRR")
+      targetIRR: $("targetIRR"),
+      leveragePct: $("leveragePct"),
+      backFinanceRate: $("backFinanceRate"),
+      useLeverage: $("useLeverage")
     };
 
     function num(el) {
@@ -420,6 +536,34 @@
       return (x * 100).toFixed(2) + "%";
     }
 
+    function getInputs() {
+      const useLeverage = fields.useLeverage.checked;
+      const leveragePct = useLeverage ? num(fields.leveragePct) / 100 : 0;
+      const initialInvestment = num(fields.initialInvestment);
+      const debtAmount = initialInvestment * leveragePct;
+      const equityInvestment = initialInvestment - debtAmount;
+      const annualInterestExpense = useLeverage ? debtAmount * (num(fields.backFinanceRate) / 100) : 0;
+
+      return {
+        initialInvestment,
+        annualOpex: num(fields.annualOpex),
+        dryDockCost: num(fields.dryDockCost),
+        annualOverhead: num(fields.annualOverhead),
+        residualValue: num(fields.residualValue),
+        investmentTerm: Math.floor(num(fields.investmentTerm)),
+        opexEscalator: num(fields.opexEscalator) / 100,
+        dryDockEscalator: num(fields.dryDockEscalator) / 100,
+        overheadEscalator: num(fields.overheadEscalator) / 100,
+        targetIRR: num(fields.targetIRR) / 100,
+        leveragePct,
+        backFinanceRate: num(fields.backFinanceRate) / 100,
+        useLeverage,
+        debtAmount,
+        equityInvestment,
+        annualInterestExpense
+      };
+    }
+
     function buildRows(input, annualRevenue) {
       const rows = [];
 
@@ -430,10 +574,15 @@
           ? input.dryDockCost * Math.pow(1 + input.dryDockEscalator, year - 1)
           : 0;
 
-        let netCashFlow = annualRevenue - opex - overhead - dryDock;
+        const interest = input.useLeverage ? input.annualInterestExpense : 0;
+
+        let cashFlowToEquity = annualRevenue - opex - overhead - dryDock - interest;
 
         if (year === input.investmentTerm) {
-          netCashFlow += input.residualValue;
+          cashFlowToEquity += input.residualValue;
+          if (input.useLeverage) {
+            cashFlowToEquity -= input.debtAmount;
+          }
         }
 
         rows.push({
@@ -442,7 +591,8 @@
           opex,
           overhead,
           dryDock,
-          netCashFlow
+          interest,
+          cashFlowToEquity
         });
       }
 
@@ -451,7 +601,9 @@
 
     function solveAnnualRevenue(input) {
       const rate = input.targetIRR;
-      let pvCosts = input.initialInvestment;
+      const baseInvestment = input.useLeverage ? input.equityInvestment : input.initialInvestment;
+
+      let pvCosts = baseInvestment;
       let pvRevenueFactor = 0;
 
       for (let year = 1; year <= input.investmentTerm; year++) {
@@ -463,16 +615,20 @@
           ? input.dryDockCost * Math.pow(1 + input.dryDockEscalator, year - 1)
           : 0;
 
-        pvCosts += (opex + overhead + dryDock) / discount;
+        const interest = input.useLeverage ? input.annualInterestExpense : 0;
+
+        pvCosts += (opex + overhead + dryDock + interest) / discount;
         pvRevenueFactor += 1 / discount;
       }
 
-      pvCosts -= input.residualValue / Math.pow(1 + rate, input.investmentTerm);
-
-      if (pvRevenueFactor <= 0) {
-        return null;
+      let terminalValue = input.residualValue;
+      if (input.useLeverage) {
+        terminalValue -= input.debtAmount;
       }
 
+      pvCosts -= terminalValue / Math.pow(1 + rate, input.investmentTerm);
+
+      if (pvRevenueFactor <= 0) return null;
       return pvCosts / pvRevenueFactor;
     }
 
@@ -488,44 +644,51 @@
           <td>${currency(Math.round(row.opex))}</td>
           <td>${currency(Math.round(row.overhead))}</td>
           <td>${currency(Math.round(row.dryDock))}</td>
-          <td>${currency(Math.round(row.netCashFlow))}</td>
+          <td>${currency(Math.round(row.interest))}</td>
+          <td>${currency(Math.round(row.cashFlowToEquity))}</td>
         `;
         body.appendChild(tr);
       }
     }
 
     function calculate() {
-      const input = {
-        initialInvestment: num(fields.initialInvestment),
-        annualOpex: num(fields.annualOpex),
-        dryDockCost: num(fields.dryDockCost),
-        annualOverhead: num(fields.annualOverhead),
-        residualValue: num(fields.residualValue),
-        investmentTerm: Math.floor(num(fields.investmentTerm)),
-        opexEscalator: num(fields.opexEscalator) / 100,
-        dryDockEscalator: num(fields.dryDockEscalator) / 100,
-        overheadEscalator: num(fields.overheadEscalator) / 100,
-        targetIRR: num(fields.targetIRR) / 100
-      };
+      const input = getInputs();
 
-      if (
-        !isFinite(input.initialInvestment) ||
-        !isFinite(input.annualOpex) ||
-        !isFinite(input.dryDockCost) ||
-        !isFinite(input.annualOverhead) ||
-        !isFinite(input.residualValue) ||
-        !isFinite(input.investmentTerm) ||
-        !isFinite(input.opexEscalator) ||
-        !isFinite(input.dryDockEscalator) ||
-        !isFinite(input.overheadEscalator) ||
-        !isFinite(input.targetIRR)
-      ) {
+      const valuesToCheck = [
+        input.initialInvestment,
+        input.annualOpex,
+        input.dryDockCost,
+        input.annualOverhead,
+        input.residualValue,
+        input.investmentTerm,
+        input.opexEscalator,
+        input.dryDockEscalator,
+        input.overheadEscalator,
+        input.targetIRR,
+        input.leveragePct,
+        input.backFinanceRate,
+        input.debtAmount,
+        input.equityInvestment,
+        input.annualInterestExpense
+      ];
+
+      if (valuesToCheck.some(v => !isFinite(v))) {
         $("statusPill").textContent = "Please enter valid inputs";
         return;
       }
 
       if (input.initialInvestment <= 0 || input.investmentTerm <= 0 || input.targetIRR <= -1) {
         $("statusPill").textContent = "Please enter valid inputs";
+        return;
+      }
+
+      if (input.leveragePct < 0 || input.leveragePct >= 1) {
+        $("statusPill").textContent = "Leverage must be between 0% and under 100%";
+        return;
+      }
+
+      if (input.useLeverage && input.equityInvestment <= 0) {
+        $("statusPill").textContent = "Equity investment must be positive";
         return;
       }
 
@@ -539,17 +702,25 @@
       const dailyRevenue = annualRevenue / 365;
       const rows = buildRows(input, annualRevenue);
 
-      const year1OpCash = rows[0].revenue - rows[0].opex - rows[0].overhead;
-      const year1Yield = year1OpCash / input.initialInvestment;
+      const denominator = input.useLeverage ? input.equityInvestment : input.initialInvestment;
 
-      const operatingCashFlows = rows.map(r => r.revenue - r.opex - r.overhead);
-      const avgYield = operatingCashFlows.reduce((a, b) => a + b, 0) / operatingCashFlows.length / input.initialInvestment;
+      const year1CashFlow = rows[0].cashFlowToEquity;
+      const year1Yield = year1CashFlow / denominator;
 
-      $("statusPill").textContent = "Calculation complete";
+      const recurringCashFlows = rows.map(r => r.revenue - r.opex - r.overhead - r.dryDock - r.interest);
+      const avgYield = recurringCashFlows.reduce((a, b) => a + b, 0) / recurringCashFlows.length / denominator;
+
+      $("statusPill").textContent = input.useLeverage ? "Calculation complete (levered)" : "Calculation complete (unlevered)";
       $("dailyRevenue").textContent = currency2(dailyRevenue);
       $("annualRevenue").textContent = currency(Math.round(annualRevenue));
+      $("equityInvestment").textContent = currency(Math.round(denominator));
+      $("annualInterestExpense").textContent = currency(Math.round(input.annualInterestExpense));
       $("year1Yield").textContent = pct(year1Yield);
       $("avgYield").textContent = pct(avgYield);
+
+      $("yieldBasisText").textContent = input.useLeverage
+        ? "Yield basis: cash flow to equity / initial equity investment"
+        : "Yield basis: unlevered operating cash flow / initial investment";
 
       renderSchedule(rows);
     }
@@ -562,6 +733,8 @@
       fields.targetIRR.value = next;
       calculate();
     });
+
+    fields.useLeverage.addEventListener("change", calculate);
 
     window.addEventListener("load", () => {
       try {
