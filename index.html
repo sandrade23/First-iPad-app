@@ -124,6 +124,11 @@
       box-shadow: 0 0 0 3px rgba(122,162,255,0.15);
     }
 
+    input:disabled {
+      opacity: 0.5;
+      background: #0a1120;
+    }
+
     .actions {
       display: flex;
       gap: 12px;
@@ -392,23 +397,23 @@
             </div>
 
             <div class="field">
-              <label for="leveragePct">Leverage %</label>
-              <input id="leveragePct" type="number" step="0.01" value="50" />
+              <label for="backLeveragePct">Back Leverage % of Purchase Price</label>
+              <input id="backLeveragePct" type="number" step="0.01" value="50" disabled />
             </div>
 
             <div class="field">
-              <label for="backFinanceRate">Back Finance Interest Rate %</label>
-              <input id="backFinanceRate" type="number" step="0.01" value="8" />
+              <label for="backLeverageRate">Back Leverage Interest Rate</label>
+              <input id="backLeverageRate" type="number" step="0.01" value="8" disabled />
             </div>
           </div>
 
           <div class="toggle-row">
             <div class="toggle-copy">
-              <div class="toggle-title">Use Back Leverage</div>
-              <div class="toggle-sub">Turn leverage on to calculate equity-based cash yield after annual back finance interest expense.</div>
+              <div class="toggle-title">Include Back Leverage</div>
+              <div class="toggle-sub">Turn on to calculate equity-based cash yield after annual back leverage interest expense.</div>
             </div>
-            <label class="switch" aria-label="Use Back Leverage">
-              <input id="useLeverage" type="checkbox" />
+            <label class="switch" aria-label="Include Back Leverage">
+              <input id="useBackLeverage" type="checkbox" />
               <span class="slider"></span>
             </label>
           </div>
@@ -419,7 +424,7 @@
           </div>
 
           <div class="note">
-            Assumptions: daily gross revenue is flat across the full investment term; annual revenue = daily revenue × 365; dry dock occurs in years 5, 10, 15, etc.; residual value is received in the final year. Back leverage, when turned on, is modeled as interest-only with no amortization.
+            Assumptions: daily gross revenue is flat across the full investment term; annual revenue = daily revenue × 365; dry dock occurs in years 5, 10, 15, etc.; residual value is received in the final year. Back leverage, when turned on, is modeled as interest-only with principal repaid at exit from sale proceeds.
           </div>
         </div>
       </section>
@@ -485,7 +490,7 @@
           </div>
 
           <div class="footer">
-            Break-even revenue is solved by setting NPV equal to zero at the target IRR. With leverage off, the target IRR is applied to the full investment. With leverage on, the target IRR is applied to initial equity only and annual interest expense is deducted from equity cash flow.
+            Break-even revenue is solved by setting NPV equal to zero at the target IRR. With back leverage off, the target IRR is applied to the full investment. With back leverage on, the target IRR is applied to initial equity only and annual interest expense is deducted from equity cash flow.
           </div>
         </div>
       </section>
@@ -506,9 +511,9 @@
       dryDockEscalator: $("dryDockEscalator"),
       overheadEscalator: $("overheadEscalator"),
       targetIRR: $("targetIRR"),
-      leveragePct: $("leveragePct"),
-      backFinanceRate: $("backFinanceRate"),
-      useLeverage: $("useLeverage")
+      backLeveragePct: $("backLeveragePct"),
+      backLeverageRate: $("backLeverageRate"),
+      useBackLeverage: $("useBackLeverage")
     };
 
     function num(el) {
@@ -536,13 +541,21 @@
       return (x * 100).toFixed(2) + "%";
     }
 
+    function updateBackLeverageFields() {
+      const enabled = fields.useBackLeverage.checked;
+      fields.backLeveragePct.disabled = !enabled;
+      fields.backLeverageRate.disabled = !enabled;
+    }
+
     function getInputs() {
-      const useLeverage = fields.useLeverage.checked;
-      const leveragePct = useLeverage ? num(fields.leveragePct) / 100 : 0;
+      const useBackLeverage = fields.useBackLeverage.checked;
+      const backLeveragePct = useBackLeverage ? num(fields.backLeveragePct) / 100 : 0;
+      const backLeverageRate = useBackLeverage ? num(fields.backLeverageRate) / 100 : 0;
+
       const initialInvestment = num(fields.initialInvestment);
-      const debtAmount = initialInvestment * leveragePct;
+      const debtAmount = initialInvestment * backLeveragePct;
       const equityInvestment = initialInvestment - debtAmount;
-      const annualInterestExpense = useLeverage ? debtAmount * (num(fields.backFinanceRate) / 100) : 0;
+      const annualInterestExpense = useBackLeverage ? debtAmount * backLeverageRate : 0;
 
       return {
         initialInvestment,
@@ -555,9 +568,9 @@
         dryDockEscalator: num(fields.dryDockEscalator) / 100,
         overheadEscalator: num(fields.overheadEscalator) / 100,
         targetIRR: num(fields.targetIRR) / 100,
-        leveragePct,
-        backFinanceRate: num(fields.backFinanceRate) / 100,
-        useLeverage,
+        useBackLeverage,
+        backLeveragePct,
+        backLeverageRate,
         debtAmount,
         equityInvestment,
         annualInterestExpense
@@ -574,13 +587,13 @@
           ? input.dryDockCost * Math.pow(1 + input.dryDockEscalator, year - 1)
           : 0;
 
-        const interest = input.useLeverage ? input.annualInterestExpense : 0;
+        const interest = input.useBackLeverage ? input.annualInterestExpense : 0;
 
         let cashFlowToEquity = annualRevenue - opex - overhead - dryDock - interest;
 
         if (year === input.investmentTerm) {
           cashFlowToEquity += input.residualValue;
-          if (input.useLeverage) {
+          if (input.useBackLeverage) {
             cashFlowToEquity -= input.debtAmount;
           }
         }
@@ -601,7 +614,7 @@
 
     function solveAnnualRevenue(input) {
       const rate = input.targetIRR;
-      const baseInvestment = input.useLeverage ? input.equityInvestment : input.initialInvestment;
+      const baseInvestment = input.useBackLeverage ? input.equityInvestment : input.initialInvestment;
 
       let pvCosts = baseInvestment;
       let pvRevenueFactor = 0;
@@ -615,14 +628,14 @@
           ? input.dryDockCost * Math.pow(1 + input.dryDockEscalator, year - 1)
           : 0;
 
-        const interest = input.useLeverage ? input.annualInterestExpense : 0;
+        const interest = input.useBackLeverage ? input.annualInterestExpense : 0;
 
         pvCosts += (opex + overhead + dryDock + interest) / discount;
         pvRevenueFactor += 1 / discount;
       }
 
       let terminalValue = input.residualValue;
-      if (input.useLeverage) {
+      if (input.useBackLeverage) {
         terminalValue -= input.debtAmount;
       }
 
@@ -665,8 +678,8 @@
         input.dryDockEscalator,
         input.overheadEscalator,
         input.targetIRR,
-        input.leveragePct,
-        input.backFinanceRate,
+        input.backLeveragePct,
+        input.backLeverageRate,
         input.debtAmount,
         input.equityInvestment,
         input.annualInterestExpense
@@ -682,13 +695,13 @@
         return;
       }
 
-      if (input.leveragePct < 0 || input.leveragePct >= 1) {
-        $("statusPill").textContent = "Leverage must be between 0% and under 100%";
+      if (input.backLeveragePct < 0 || input.backLeveragePct >= 1) {
+        $("statusPill").textContent = "Back leverage must be between 0% and under 100%";
         return;
       }
 
-      if (input.useLeverage && input.equityInvestment <= 0) {
-        $("statusPill").textContent = "Equity investment must be positive";
+      if (input.useBackLeverage && input.equityInvestment <= 0) {
+        $("statusPill").textContent = "Initial equity investment must be positive";
         return;
       }
 
@@ -702,15 +715,14 @@
       const dailyRevenue = annualRevenue / 365;
       const rows = buildRows(input, annualRevenue);
 
-      const denominator = input.useLeverage ? input.equityInvestment : input.initialInvestment;
-
+      const denominator = input.useBackLeverage ? input.equityInvestment : input.initialInvestment;
       const year1CashFlow = rows[0].cashFlowToEquity;
       const year1Yield = year1CashFlow / denominator;
 
       const recurringCashFlows = rows.map(r => r.revenue - r.opex - r.overhead - r.dryDock - r.interest);
       const avgYield = recurringCashFlows.reduce((a, b) => a + b, 0) / recurringCashFlows.length / denominator;
 
-      $("statusPill").textContent = input.useLeverage ? "Calculation complete (levered)" : "Calculation complete (unlevered)";
+      $("statusPill").textContent = input.useBackLeverage ? "Calculation complete (with back leverage)" : "Calculation complete (unlevered)";
       $("dailyRevenue").textContent = currency2(dailyRevenue);
       $("annualRevenue").textContent = currency(Math.round(annualRevenue));
       $("equityInvestment").textContent = currency(Math.round(denominator));
@@ -718,7 +730,7 @@
       $("year1Yield").textContent = pct(year1Yield);
       $("avgYield").textContent = pct(avgYield);
 
-      $("yieldBasisText").textContent = input.useLeverage
+      $("yieldBasisText").textContent = input.useBackLeverage
         ? "Yield basis: cash flow to equity / initial equity investment"
         : "Yield basis: unlevered operating cash flow / initial investment";
 
@@ -734,10 +746,14 @@
       calculate();
     });
 
-    fields.useLeverage.addEventListener("change", calculate);
+    fields.useBackLeverage.addEventListener("change", () => {
+      updateBackLeverageFields();
+      calculate();
+    });
 
     window.addEventListener("load", () => {
       try {
+        updateBackLeverageFields();
         calculate();
       } catch (err) {
         $("statusPill").textContent = "Error running calculation";
